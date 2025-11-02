@@ -1,0 +1,115 @@
+# Import necessary libraries for data handling, PCA, modeling, and visualization
+import numpy as np                          # For numerical operations, especially array handling
+import pandas as pd                         # For data manipulation and structure
+import matplotlib.pyplot as plt             # For plotting the graph
+from sklearn.datasets import load_breast_cancer # Function to load the base data
+from sklearn.preprocessing import StandardScaler  # To standardize the data
+from sklearn.decomposition import PCA       # Principal Component Analysis module
+from sklearn.model_selection import train_test_split # To split data for model training
+from sklearn.linear_model import LogisticRegression # A basic classification model
+from sklearn.metrics import accuracy_score  # To evaluate the classification model's performance
+from sklearn.impute import SimpleImputer    # For handling missing values
+
+# --- 1. Data Loading ---
+print("--- Data Loading ---")
+# Load the base breast cancer dataset (simulating reading from a local file structure)
+data = load_breast_cancer()
+
+# Separate features (X) and target (y)
+# Converting to DataFrame ensures compatibility with the Imputer and makes features named
+X = pd.DataFrame(data.data, columns=data.feature_names) 
+y = data.target  # Target (Malignant/Benign)
+
+# Note: The original sklearn dataset is clean. In a real-world scenario, 
+# you would load your local data here (e.g., X = pd.read_csv('my_data.csv')) 
+
+
+# --- 2. Data Cleaning: Imputation for Missing Values ---
+print("\n--- Data Cleaning: Imputation (Robustness Check) ---")
+# Initialize the imputer to fill any potential missing values using the mean of each column
+# This step is included to account for any missing data your real dataset may have
+imputer = SimpleImputer(strategy='mean')
+# Fit the imputer to the data and transform it (fills NaNs if they exist)
+X_imputed = imputer.fit_transform(X)
+
+
+# --- 3. Standardization ---
+print("--- Data Standardization ---")
+# Standardization is crucial for PCA (mean=0, variance=1)
+scaler = StandardScaler()
+# Fit the scaler to the imputed features and transform the data
+X_scaled = scaler.fit_transform(X_imputed)
+
+
+# --- 4. Principal Component Analysis (PCA) ---
+# Initialize PCA with no specific number of components to capture all variance initially
+pca = PCA()
+# Fit PCA to the standardized data
+pca.fit(X_scaled)
+
+# Calculate the cumulative explained variance ratio
+# This shows how much information (variance) is retained by adding components
+cumulative_variance = np.cumsum(pca.explained_variance_ratio_)
+
+# --- 5. Basic Graph: Explained Variance Plot (Scree Plot) ---
+print("\n--- Generating Explained Variance Plot ---")
+plt.figure(figsize=(8, 5)) # Create a new figure for the plot
+plt.plot(range(1, len(cumulative_variance) + 1), cumulative_variance, marker='o', linestyle='--') # Plot the cumulative variance
+plt.title('Cumulative Explained Variance by Principal Components') # Set the plot title
+plt.xlabel('Number of Principal Components') # Label the x-axis
+plt.ylabel('Cumulative Explained Variance Ratio') # Label the y-axis
+plt.grid(True) # Add a grid for readability
+# Draw a horizontal line at 0.95 (95% variance retained) to suggest a cutoff
+plt.axhline(y=0.95, color='r', linestyle='-', label='95% Variance Threshold')
+plt.legend() # Show the legend for the threshold line
+plt.show() # Display the plot
+
+# --- 6. Determine Optimal Components and Transform Data ---
+# Find the number of components needed to retain 95% of the variance
+n_components = np.where(cumulative_variance >= 0.95)[0][0] + 1
+print(f"\nNumber of components needed to retain 95% variance: {n_components}")
+
+# Re-run PCA with the optimal number of components
+pca_final = PCA(n_components=n_components)
+# Transform the standardized data into the reduced PCA space
+X_pca = pca_final.fit_transform(X_scaled)
+
+# --- 7. Accuracy/Performance Metric (using reduced data for classification) ---
+print("\n--- Performance Metric: Classification using PCA features ---")
+# Split the PCA-transformed data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(
+    X_pca, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# Initialize a Logistic Regression model
+model = LogisticRegression(random_state=42)
+# Train the model on the reduced feature space
+model.fit(X_train, y_train)
+
+# Make predictions on the test set
+y_pred = model.predict(X_test)
+
+# Calculate the accuracy (the basic performance metric)
+accuracy = accuracy_score(y_test, y_pred)
+
+# Print the final accuracy metric
+print(f"Classification Accuracy using {n_components} Principal Components: {accuracy:.4f}")
+
+# Example of Explained Variance from the first few components (Metric part 2)
+print("\nIndividual Explained Variance for first 5 components:")
+# Print the explained variance ratio for the components used in the final PCA
+for i in range(min(5, n_components)):
+    print(f"PC {i+1}: {pca_final.explained_variance_ratio_[i]:.4f}")
+
+# Optional: Visualize the first two principal components (for n_components >= 2)
+if n_components >= 2:
+    print("\n--- Visualizing First Two Principal Components ---")
+    plt.figure(figsize=(8, 6)) # Create a new figure
+    # Scatter plot data points, colored by the original target class
+    scatter = plt.scatter(X_pca[:, 0], X_pca[:, 1], c=y, cmap='viridis', alpha=0.7)
+    plt.title('Breast Cancer Data in First Two Principal Components (PC1 vs PC2)') 
+    plt.xlabel('Principal Component 1') # Label X axis
+    plt.ylabel('Principal Component 2') # Label Y axis
+    # Add a legend mapping colors to cancer types
+    plt.legend(handles=scatter.legend_elements()[0], labels=data.target_names)
+    plt.show() # Display the plot
