@@ -1,0 +1,83 @@
+import numpy as np
+
+# Define the function to optimize (maximize)
+def f(x):
+    return x * np.sin(10 * np.pi * x) + 1.0  # Example function
+
+# GA Parameters
+population_size = 20
+generations = 50
+crossover_prob = 0.8
+mutation_prob = 0.1
+x_bounds = [0, 1]  # variable bounds
+
+# Initialize population randomly within bounds
+population = np.random.uniform(x_bounds[0], x_bounds[1], population_size)
+
+# Fitness function
+def fitness(x):
+    return f(x)
+
+# Selection: Roulette Wheel
+def select(pop, fit):
+    fit_sum = np.sum(fit)
+    probs = fit / fit_sum
+    indices = np.random.choice(len(pop), size=len(pop), p=probs)
+    return pop[indices]
+
+# Crossover: Single-point
+def crossover(parent1, parent2):
+    if np.random.rand() < crossover_prob:
+        alpha = np.random.rand()
+        child1 = alpha * parent1 + (1 - alpha) * parent2
+        child2 = alpha * parent2 + (1 - alpha) * parent1
+        return child1, child2
+    else:
+        return parent1, parent2
+
+# Mutation
+def mutate(x):
+    if np.random.rand() < mutation_prob:
+        x += np.random.uniform(-0.1, 0.1)
+        x = np.clip(x, x_bounds[0], x_bounds[1])
+    return x
+
+# Main GA loop
+best_history = []
+for gen in range(generations):
+    fit_values = fitness(population)
+    best_idx = np.argmax(fit_values)
+    best_history.append(fit_values[best_idx])
+    
+    # Selection
+    population = select(population, fit_values)
+    
+    # Crossover
+    new_population = []
+    for i in range(0, population_size, 2):
+        parent1, parent2 = population[i], population[i+1]
+        child1, child2 = crossover(parent1, parent2)
+        new_population.extend([child1, child2])
+    
+    # Mutation
+    population = np.array([mutate(x) for x in new_population])
+
+# Final best solution
+fit_values = fitness(population)
+best_idx = np.argmax(fit_values)
+best_x = population[best_idx]
+best_y = fit_values[best_idx]
+
+print("\n===== GENETIC ALGORITHM OPTIMIZATION =====")
+print(f"Best solution x: {best_x:.6f}")
+print(f"Maximum value f(x): {best_y:.6f}")
+print("==========================================\n")
+
+# Plot fitness over generations
+import matplotlib.pyplot as plt
+plt.plot(best_history, 'r-o')
+plt.title('Best Fitness Over Generations')
+plt.xlabel('Generation')
+plt.ylabel('Fitness')
+plt.grid(True)
+plt.show()
